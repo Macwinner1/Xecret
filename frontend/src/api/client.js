@@ -90,4 +90,67 @@ export const streamingAPI = {
     apiClient.post('/stream/session/renew', { session_key }),
 };
 
+// Social API
+export const socialAPI = {
+  addComment: (content_id, comment_text) => 
+    apiClient.post('/social/comments', { content_id, comment_text }),
+  
+  getComments: (contentId) => 
+    apiClient.get(`/social/comments/${contentId}`),
+  
+  likeComment: (commentId) => 
+    apiClient.post(`/social/comments/${commentId}/like`),
+  
+  deleteComment: (commentId) => 
+    apiClient.delete(`/social/comments/${commentId}`),
+  
+  toggleBookmark: (content_id) => 
+    apiClient.post('/social/bookmarks', { content_id }),
+  
+  getBookmarks: () => 
+    apiClient.get('/social/bookmarks'),
+  
+  followUser: (username) => 
+    apiClient.post(`/social/follow/${username}`),
+  
+  getFollowStats: (username) => 
+    apiClient.get(`/social/follow/stats/${username}`),
+};
+
+// Messaging API
+export const messagingAPI = {
+  sendMessage: (recipient_username, message_text) => 
+    apiClient.post('/messages/send', { recipient_username, message_text }),
+  
+  getConversation: (username) => 
+    apiClient.get(`/messages/conversation/${username}`),
+  
+  getConversations: () => 
+    apiClient.get('/messages/conversations'),
+  
+  getUnreadCount: () => 
+    apiClient.get('/messages/unread-count'),
+};
+
+// Wallet API
+export const walletAPI = {
+  getBalance: () => 
+    apiClient.get('/wallet/balance'),
+  
+  deposit: (amount, payment_method, details) => 
+    apiClient.post('/wallet/deposit', { amount, payment_method, ...details }),
+  
+  withdraw: (amount, withdrawal_method, details) => 
+    apiClient.post('/wallet/withdraw', { amount, withdrawal_method, ...details }),
+  
+  cancelWithdrawal: (withdrawal_id) => 
+    apiClient.post('/wallet/cancel-withdrawal', { withdrawal_id }),
+  
+  getWithdrawals: () => 
+    apiClient.get('/wallet/withdrawals'),
+  
+  getTransactions: () => 
+    apiClient.get('/wallet/transactions'),
+};
+
 export default apiClient;

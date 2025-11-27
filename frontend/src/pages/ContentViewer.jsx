@@ -1,7 +1,7 @@
 import { useEffect, useState, useRef } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import { useSelector } from 'react-redux';
-import { contentAPI, paymentAPI, streamingAPI } from '../api/client';
+import { contentAPI, paymentAPI, streamingAPI, socialAPI, messagingAPI } from '../api/client';
 
 function ContentViewer() {
   const { contentId } = useParams();
@@ -15,6 +15,11 @@ function ContentViewer() {
   const [tipAmount, setTipAmount] = useState('');
   const [tipMessage, setTipMessage] = useState('');
   const [showTipForm, setShowTipForm] = useState(false);
+  const [comments, setComments] = useState([]);
+  const [commentText, setCommentText] = useState('');
+  const [isBookmarked, setIsBookmarked] = useState(false);
+  const [followStats, setFollowStats] = useState({ followers: 0, following: 0 });
+  const [isFollowing, setIsFollowing] = useState(false);
   const videoRef = useRef(null);
   const imageRef = useRef(null);
   
@@ -70,12 +75,78 @@ function ContentViewer() {
         // Get file URL
         const url = streamingAPI.getFileUrl(contentId, sessionResponse.data.session_key);
         setFileUrl(url);
+
+        // Load comments
+        loadComments();
+      }
+
+      // Load follow stats
+      if (contentResponse.data.creator_username) {
+        const statsResponse = await socialAPI.getFollowStats(contentResponse.data.creator_username);
+        setFollowStats(statsResponse.data);
       }
     } catch (error) {
       console.error('Failed to load content:', error);
       alert('Failed to load content');
     } finally {
       setLoading(false);
+    }
+  };
+
+  const loadComments = async () => {
+    try {
+      const response = await socialAPI.getComments(contentId);
+      setComments(response.data.comments);
+    } catch (error) {
+      console.error('Failed to load comments:', error);
+    }
+  };
+
+  const handleAddComment = async (e) => {
+    e.preventDefault();
+    if (!commentText.trim()) return;
+
+    try {
+      await socialAPI.addComment(contentId, commentText);
+      setCommentText('');
+      loadComments();
+    } catch (error) {
+      alert(error.response?.data?.error || 'Failed to add comment');
+    }
+  };
+
+  const handleLikeComment = async (commentId) => {
+    try {
+      await socialAPI.likeComment(commentId);
+      loadComments();
+    } catch (error) {
+      console.error('Failed to like comment:', error);
+    }
+  };
+
+  const handleToggleBookmark = async () => {
+    try {
+      const response = await socialAPI.toggleBookmark(contentId);
+      setIsBookmarked(response.data.action === 'added');
+      alert(response.data.action === 'added' ? 'Bookmarked!' : 'Bookmark removed');
+    } catch (error) {
+      alert('Failed to toggle bookmark');
+    }
+  };
+
+  const handleMessageCreator = () => {
+    navigate(`/messages?user=${content.creator_username}`);
+  };
+
+  const handleFollowCreator = async () => {
+    try {
+      const response = await socialAPI.followUser(content.creator_username);
+      setIsFollowing(response.data.action === 'followed');
+      // Reload stats
+      const statsResponse = await socialAPI.getFollowStats(content.creator_username);
+      setFollowStats(statsResponse.data);
+    } catch (error) {
+      alert(error.response?.data?.error || 'Failed to follow');
     }
   };
 
@@ -161,7 +232,7 @@ function ContentViewer() {
   }
 
   return (
-    <div className="min-h-screen bg-black text-white">
+    <div className="min-h-screen bg-[#0f1419] text-white">
       {/* Warning banner */}
       <div className="bg-red-900/80 px-6 py-2 text-center">
         <p className="text-sm">
@@ -169,128 +240,105 @@ function ContentViewer() {
         </p>
       </div>
 
-      <div className="container mx-auto px-4 py-8">
+      <div className="max-w-4xl mx-auto px-4 py-8">
         <div className="mb-4">
           <Link to="/" className="text-blue-400 hover:text-blue-300">
-            ← Back to Home
+            ← Back to Timeline
           </Link>
         </div>
 
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-          {/* Content viewer */}
-          <div className="lg:col-span-2">
-            <div className="protected-content relative bg-gray-900 rounded-lg overflow-hidden">
-              {content.content_type === 'photo' ? (
-                <img
-                  ref={imageRef}
-                  src={fileUrl}
-                  alt="Content"
-                  className="w-full h-auto"
-                  onContextMenu={(e) => e.preventDefault()}
-                  draggable={false}
-                />
-              ) : (
-                <video
-                  ref={videoRef}
-                  src={fileUrl}
-                  controls
-                  controlsList="nodownload"
-                  className="w-full h-auto"
-                  onContextMenu={(e) => e.preventDefault()}
-                >
-                  Your browser does not support video playback.
-                </video>
-              )}
+        {/* Content viewer */}
+        <div className="mb-8">
+          <div className="protected-content relative bg-[#1a1f2e] rounded-xl overflow-hidden border border-gray-800">
+            {content.content_type === 'photo' ? (
+              <img
+                ref={imageRef}
+                src={fileUrl}
+                alt="Content"
+                className="w-full h-auto"
+                onContextMenu={(e) => e.preventDefault()}
+                draggable={false}
+              />
+            ) : (
+              <video
+                ref={videoRef}
+                src={fileUrl}
+                controls
+                controlsList="nodownload"
+                className="w-full h-auto"
+                onContextMenu={(e) => e.preventDefault()}
+              >
+                Your browser does not support video playback.
+              </video>
+            )}
 
-              {/* Watermark overlay */}
-              <div className="absolute bottom-4 right-4 text-white/50 text-xs pointer-events-none select-none">
-                {watermark}
-              </div>
+            {/* Watermark overlay */}
+            <div className="absolute bottom-4 right-4 text-white/50 text-xs pointer-events-none select-none">
+              {watermark}
             </div>
           </div>
+        </div>
 
-          {/* Sidebar */}
-          <div className="space-y-6">
-            {/* Creator info */}
-            <div className="bg-gray-800 p-6 rounded-lg">
-              <h3 className="text-xl font-bold mb-2">Creator</h3>
-              <p className="text-gray-400">@{content.creator_username}</p>
-              <div className="mt-4 space-y-2 text-sm text-gray-400">
-                <p>{content.view_count} views</p>
-                <p>{content.tip_count} tips received</p>
-              </div>
+        {/* Comments Section */}
+        <div className="bg-[#1a1f2e] rounded-xl p-6 border border-gray-800">
+          <h2 className="text-2xl font-bold mb-6">Comments ({comments.length})</h2>
+
+          {/* Add Comment Form */}
+          <form onSubmit={handleAddComment} className="mb-6">
+            <textarea
+              value={commentText}
+              onChange={(e) => setCommentText(e.target.value)}
+              placeholder="Add a comment... Use @username to mention someone"
+              className="w-full px-4 py-3 bg-[#0f1419] rounded-lg text-white resize-none focus:outline-none focus:ring-2 focus:ring-blue-500"
+              rows="3"
+            />
+            <div className="mt-2 flex justify-between items-center">
+              <p className="text-sm text-gray-400">
+                Tip: Use @username to mention creators
+              </p>
+              <button
+                type="submit"
+                className="bg-blue-600 hover:bg-blue-700 px-6 py-2 rounded-lg font-semibold"
+              >
+                Post Comment
+              </button>
             </div>
+          </form>
 
-            {/* Tip creator */}
-            <div className="bg-gray-800 p-6 rounded-lg">
-              <h3 className="text-xl font-bold mb-4">Support Creator</h3>
-              {!showTipForm ? (
-                <button
-                  onClick={() => setShowTipForm(true)}
-                  className="w-full bg-green-600 hover:bg-green-700 py-3 rounded-lg"
-                >
-                  Send Tip
-                </button>
-              ) : (
-                <div className="space-y-3">
-                  <input
-                    type="number"
-                    step="0.01"
-                    min="0.01"
-                    value={tipAmount}
-                    onChange={(e) => setTipAmount(e.target.value)}
-                    placeholder="Amount (SUI)"
-                    className="w-full px-4 py-2 bg-gray-700 rounded-lg text-white"
-                  />
-                  <textarea
-                    value={tipMessage}
-                    onChange={(e) => setTipMessage(e.target.value)}
-                    placeholder="Optional message"
-                    className="w-full px-4 py-2 bg-gray-700 rounded-lg text-white"
-                    rows="3"
-                  />
-                  <div className="flex gap-2">
+          {/* Comments List */}
+          <div className="space-y-4">
+            {comments.length > 0 ? (
+              comments.map((comment) => (
+                <div key={comment.comment_id} className="bg-[#0f1419] p-4 rounded-lg">
+                  <div className="flex justify-between items-start mb-2">
+                    <p className="font-bold text-blue-400">@{comment.username}</p>
+                    <p className="text-xs text-gray-400">
+                      {new Date(comment.created_at).toLocaleString()}
+                    </p>
+                  </div>
+                  <p className="text-gray-200 mb-3 whitespace-pre-wrap">{comment.comment_text}</p>
+                  <div className="flex items-center gap-4">
                     <button
-                      onClick={handleSendTip}
-                      className="flex-1 bg-green-600 hover:bg-green-700 py-2 rounded-lg"
+                      onClick={() => handleLikeComment(comment.comment_id)}
+                      className={`flex items-center gap-1 text-sm ${
+                        comment.is_liked ? 'text-red-400' : 'text-gray-400'
+                      } hover:text-red-400`}
                     >
-                      Send
+                      {comment.is_liked ? '❤️' : '🤍'} {comment.like_count}
                     </button>
-                    <button
-                      onClick={() => setShowTipForm(false)}
-                      className="flex-1 bg-gray-600 hover:bg-gray-700 py-2 rounded-lg"
-                    >
-                      Cancel
-                    </button>
+                    {comment.mentions && comment.mentions.length > 0 && (
+                      <span className="text-xs text-gray-500">
+                        Mentioned: {comment.mentions.map(m => `@${m}`).join(', ')}
+                      </span>
+                    )}
                   </div>
                 </div>
-              )}
-            </div>
-
-            {/* Content info */}
-            <div className="bg-gray-800 p-6 rounded-lg">
-              <h3 className="text-xl font-bold mb-4">Content Info</h3>
-              <div className="space-y-2 text-sm">
-                <div className="flex justify-between">
-                  <span className="text-gray-400">Type:</span>
-                  <span>{content.content_type}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-gray-400">Access:</span>
-                  <span>{content.access_type === 'free' ? 'Free' : 'Pay-Per-View'}</span>
-                </div>
-                {content.access_type === 'ppv' && (
-                  <div className="flex justify-between">
-                    <span className="text-gray-400">Price:</span>
-                    <span>{content.price} SUI</span>
-                  </div>
-                )}
-                <div className="flex justify-between">
-                  <span className="text-gray-400">Purchases:</span>
-                  <span>{content.paid_viewer_count}</span>
-                </div>
-              </div>
-            </div>
+              ))
+            ) : (
+              <p className="text-gray-400 text-center py-8">
+                No comments yet. Be the first to comment!
+              </p>
+            )}
           </div>
         </div>
       </div>

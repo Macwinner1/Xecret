@@ -8,6 +8,9 @@ import authRoutes from './routes/auth.js';
 import contentRoutes from './routes/content.js';
 import paymentRoutes from './routes/payment.js';
 import streamingRoutes from './routes/streaming.js';
+import socialRoutes from './routes/social.js';
+import messagingRoutes from './routes/messaging.js';
+import walletRoutes from './routes/wallet.js';
 
 dotenv.config();
 
@@ -31,6 +34,9 @@ app.use('/api/auth', authRoutes);
 app.use('/api/content', contentRoutes);
 app.use('/api/payment', paymentRoutes);
 app.use('/api/stream', streamingRoutes);
+app.use('/api/social', socialRoutes);
+app.use('/api/messages', messagingRoutes);
+app.use('/api/wallet', walletRoutes);
 
 // Health check
 app.get('/health', (req, res) => {
@@ -39,4 +45,5 @@ app.get('/health', (req, res) => {
 
 app.listen(PORT, () => {
   console.log(`Server running on port ${PORT}`);
+  console.log(`Features: Auth, Content, Payment, Streaming, Social, Messaging, Wallet`);
 });

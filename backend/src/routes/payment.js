@@ -56,6 +56,19 @@ router.post('/purchase', verifyToken, async (req, res) => {
       db.users.set(content.creator_id, creator);
     }
 
+    // Add earnings to creator's wallet balance
+    let creatorWallet = db.wallets.get(content.creator_id);
+    if (!creatorWallet) {
+      creatorWallet = {
+        user_id: content.creator_id,
+        balance: 0,
+        pending_balance: 0,
+        created_at: new Date().toISOString(),
+      };
+    }
+    creatorWallet.balance += creator_amount;
+    db.wallets.set(content.creator_id, creatorWallet);
+
     res.json({
       success: true,
       purchase_id,
@@ -110,6 +123,19 @@ router.post('/tip', verifyToken, async (req, res) => {
     recipient.total_tips_received += recipient_amount;
     recipient.total_earnings += recipient_amount;
     db.users.set(recipient.user_id, recipient);
+
+    // Add tip amount to recipient's wallet balance
+    let recipientWallet = db.wallets.get(recipient.user_id);
+    if (!recipientWallet) {
+      recipientWallet = {
+        user_id: recipient.user_id,
+        balance: 0,
+        pending_balance: 0,
+        created_at: new Date().toISOString(),
+      };
+    }
+    recipientWallet.balance += recipient_amount;
+    db.wallets.set(recipient.user_id, recipientWallet);
 
     // Update content tip count if applicable
     if (content_id) {
